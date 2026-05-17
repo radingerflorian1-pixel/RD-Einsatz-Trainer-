@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RD Live-Trainer & Cloud-Datenbank</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* HELLER MODUS */
+        :root {
+            --primary: #2c3e50;
+            --accent-blue: #0078d4;
+            --accent-green: #107c41;
+            --accent-red: #a80000;
+            --accent-purple: #8a2be2;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --text-main: #201f1e;
+            --text-muted: #605e5c;
+            --border: #edebe9;
+            --input-bg: #faf9f8;
+            --table-hover: #f8fafc;
+            --table-th: #f8f9fa;
+            --box-output: #fdf6f0;
+
+            /* Saison-Farben */
+            --bg-all: #f0f4f8;     --text-all: #10436e;      --border-all: #d0e1fd;
+            --bg-spring: #e8f5e9;  --text-spring: #2e7d32;   --border-spring: #c8e6c9;
+            --bg-summer: #fffde7;  --text-summer: #f57f17;   --border-summer: #fff9c4;
+            --bg-autumn: #fff3e0;  --text-autumn: #e65100;   --border-autumn: #ffe0b2;
+            --bg-winter: #e1f5fe;  --text-winter: #0288d1;   --border-winter: #b3e5fc;
+        }
+
+        /* DUNKLER MODUS */
+        html.dark-mode {
+            --primary: #f3f4f6;
+            --accent-blue: #2ea0ff;
+            --accent-green: #199e55;
+            --accent-red: #f14c4c;
+            --accent-purple: #b066ff;
+            --bg-body: #111214;
+            --bg-card: #1c1d21;
+            --text-main: #f5f5f7;
+            --text-muted: #a1a1aa;
+            --border: #2d3139;
+            --input-bg: #25282f;
+            --table-hover: #24272e;
+            --table-th: #25282f;
+            --box-output: #2c251e;
+
+            /* Saison-Farben Dunkel */
+            --bg-all: #162536;     --text-all: #7cb3f5;      --border-all: #243e5c;
+            --bg-spring: #122b15;  --text-spring: #69c470;   --border-spring: #1e4222;
+            --bg-summer: #302a0a;  --text-summer: #f7ca40;   --border-summer: #4a4112;
+            --bg-autumn: #331f0b;  --text-autumn: #ffa047;   --border-autumn: #543415;
+            --bg-winter: #09263b;  --text-winter: #4fc3f7;   --border-winter: #143f5e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body); color: var(--text-main);
+            margin: 0; padding: 24px; line-height: 1.5;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        header {
+            display: flex; align-items: center; gap: 15px; flex-wrap: wrap;
+            margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid var(--accent-blue);
+        }
+
+        header h1 { font-size: 28px; margin: 0; color: var(--primary); font-weight: 700; }
+
+        .theme-switch-container {
+            display: flex; align-items: center; gap: 8px; margin-left: 20px;
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+        }
+
+        .theme-switch { position: relative; display: inline-block; width: 48px; height: 24px; }
+        .theme-switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1; transition: .3s; border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute; content: "☀️"; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(24px); content: "🌙"; }
+
+        /* Uhrzeit Anzeige */
+        .time-display {
+            display: flex; gap: 12px; font-size: 13px; font-weight: 600;
+            background: var(--input-bg); padding: 6px 12px; border-radius: 8px;
+            border: 1px solid var(--border); color: var(--text-main);
+        }
+        .time-box { display: flex; align-items: center; gap: 4px; }
+
+        .main-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
+        @media (min-width: 900px) { .main-layout { grid-template-columns: 450px 1fr; } }
+
+        .card {
+            background: var(--bg-card); padding: 24px; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid var(--border);
+            margin-bottom: 24px; transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .card h2 {
+            font-size: 18px; color: var(--primary); margin-top: 0; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .form-group { margin-bottom: 16px; }
+
+        .checkbox-group {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+            background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+        }
+
+        .checkbox-label {
+            display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
+            color: var(--text-main); cursor: pointer;
+        }
+        .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+        label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+
+        select, input[type="text"], textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 15px; background-color: var(--input-bg); color: var(--text-main);
+            transition: all 0.2s ease-in-out; box-sizing: border-box;
+        }
+
+        select:focus, input[type="text"]:focus, textarea:focus {
+            outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.25);
+        }
+
+        button {
+            font-family: inherit; font-weight: 600; border: none; border-radius: 6px;
+            padding: 10px 18px; font-size: 14px; cursor: pointer;
+            transition: background-color 0.1s, transform 0.05s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        button:active { transform: scale(0.98); }
+
+        .btn-primary { background-color: var(--accent-blue); color: white; width: 100%; }
+        .btn-success { background-color: var(--accent-green); color: white; width: 100%; padding: 14px; font-size: 16px; }
+        .btn-danger { background-color: rgba(168, 0, 0, 0.1); color: var(--accent-red); padding: 6px 12px; font-size: 13px; }
+        .btn-danger:hover { background-color: var(--accent-red); color: white; }
+        
+        /* Knopf zum Löschen aller Einsatze - Etwas kleiner gemacht */
+        .btn-danger-all { background-color: var(--accent-red); color: white; font-size: 12px; padding: 6px 10px; margin-bottom: 12px; width: auto; max-width: 200px; }
+        .btn-danger-all:hover { background-color: #850000; }
+        
+        .btn-purple { background-color: var(--accent-purple); color: white; width: 100%; }
+
+        .output-box {
+            background: var(--box-output); border-left: 4px solid #f2c811; color: var(--text-main);
+            padding: 16px; font-size: 16px; font-weight: 500; min-height: 80px;
+            white-space: pre-line; border-radius: 0 8px 8px 0; margin-top: 12px;
+        }
+
+        .filter-layout { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .search-container { position: relative; }
+        .search-bar { padding-left: 36px !important; font-size: 15px; }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+
+        .table-responsive { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--bg-card); color: var(--text-main); }
+        th { background-color: var(--table-th); color: var(--primary); font-weight: 600; padding: 12px 16px; border-bottom: 2px solid var(--border); text-align: left; }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        tr:hover td { background-color: var(--table-hover); }
+
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; margin-right: 4px; }
+        .badge-all { background: var(--bg-all); color: var(--text-all); border: 1px solid var(--border-all); }
+        .badge-fruehling { background: var(--bg-spring); color: var(--text-spring); border: 1px solid var(--border-spring); }
+        .badge-sommer { background: var(--bg-summer); color: var(--text-summer); border: 1px solid var(--border-summer); }
+        .badge-herbst { background: var(--bg-autumn); color: var(--text-autumn); border: 1px solid var(--border-autumn); }
+        .badge-winter { background: var(--bg-winter); color: var(--text-winter); border: 1px solid var(--border-winter); }
+        
+        .badge-art { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+        html.dark-mode .badge-art { background: #0c4a6e; color: #7dd3fc; border: 1px solid #0284c7; }
+
+        .header-badges { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+        .status-cloud { font-size: 12px; background: #ffecb3; color: #ff6f00; padding: 4px 12px; border-radius: 20px; font-weight: bold; }
+        .counter-badge { font-size: 12px; background: var(--accent-blue); color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <span>🌐</span>
+        <h1>RD Einsatz-Trainer (Live-Sync)</h1>
+        
+        <div class="theme-switch-container">
+            <span>Dunkelmodus</span>
+            <label class="theme-switch">
+                <input type="checkbox" id="themeToggleCheckbox" onchange="toggleTheme()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="time-display">
+            <div class="time-box">🕒 LOKAL: <span id="localTime">00:00:00</span></div>
+            <div class="time-box">🌍 UTC: <span id="utcTime">00:00:00</span></div>
+        </div>
+
+        <div class="header-badges">
+            <div class="counter-badge" id="einsatzCounter">📊 Einsätze gesamt: 0</div>
+            <div class="status-cloud" id="syncStatus">⏳ Verbinde...</div>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="card">
+                <h2>🎲 Zufalls-Einsatz</h2>
+                <label>Zugelassene Jahreszeiten:</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label"><input type="checkbox" id="genAll" checked> 🌐 Ganzjährig</label>
+                    <label class="checkbox-label"><input type="checkbox" id="genFruehling" checked> 🌱 Frühling</label>
+                    <label class="checkbox-label"><input type="checkbox" id="genSommer" checked> ☀️ Sommer</label>
+                    <label class="checkbox-label"><input type="checkbox" id="genHerbst" checked> 🍂 Herbst</label>
+                    <label class="checkbox-label"><input type="checkbox" id="genWinter" checked> ❄️ Winter</label>
+                </div>
+
+                <label>Zugelassene Einsatzarten:</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label"><input type="checkbox" id="artGenAllgemein" checked> 📋 Allgemein</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenGeburt" checked> 👶 Geburt</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenRea" checked> 🫀 Reanimation</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenTrauma" checked> 🩹 Trauma</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenVu" checked> 🚗 VU</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenHeli" checked> 🚁 Sek. Heli</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenNeuro" checked> 🧠 Neurologie</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenKardio" checked> ❤️ Kardiologie</label>
+                    <label class="checkbox-label"><input type="checkbox" id="artGenPsyche" checked> 👥 Psyche</label>
+                </div>
+
+                <button class="btn-success" onclick="generateEinsatz()">⚡ Nächster Einsatz</button>
+                <div class="output-box" id="einsatzOutput">Klicke auf den Button...</div>
+            </div>
+
+            <div class="card">
+                <h2>➕ Einzelnen Einsatz hinzufügen</h2>
+                <div class="form-group">
+                    <label for="inpPatient">Patient</label>
+                    <input type="text" id="inpPatient" placeholder="z.B. M, 63 J">
+                </div>
+                <div class="form-group">
+                    <label for="inpAbcde">ABCDE Problem</label>
+                    <input type="text" id="inpAbcde" placeholder="z.B. B_ATMUNG / C_KREISLAUF">
+                </div>
+                <div class="form-group">
+                    <label for="inpSymptome">Symptome & Details</label>
+                    <textarea id="inpSymptome" rows="3" placeholder="z.B. retrosternales Druckgefühl..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="inpSaison">Jahreszeit / Zuordnung</label>
+                    <select id="inpSaison">
+                        <option value="all">🌐 Ganzjährig / Allgemein</option>
+                        <option value="fruehling">🌱 Frühling</option>
+                        <option value="sommer">☀️ Sommer</option>
+                        <option value="herbst">🍂 Herbst</option>
+                        <option value="winter">❄️ Winter</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="inpArt">Einsatzart</label>
+                    <select id="inpArt">
+                        <option value="allgemein">📋 Allgemeiner Einsatz</option>
+                        <option value="geburt">👶 Geburt / Gynäkologie</option>
+                        <option value="rea">🫀 Reanimation (CPR)</option>
+                        <option value="trauma">🩹 Trauma / Unfall</option>
+                        <option value="vu">🚗 VU / Technische Hilfeleistung</option>
+                        <option value="heli">🚁 Sekundär Helikopter (Verlegung)</option>
+                        <option value="neuro">🧠 Neurologie (Schlaganfall etc.)</option>
+                        <option value="kardio">❤️ Kardiologie (Herzinfarkt etc.)</option>
+                        <option value="psyche">👥 Psychiatrischer Notfall</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="addEinsatz()">💾 In Cloud speichern</button>
+            </div>
+
+            <div class="card">
+                <h2>🚀 Massen-Upload (Bulk Import)</h2>
+                <div class="form-group">
+                    <label for="bulkInput">Einsätze einfügen (Format: Patient | Problem | Symptome | Saison | Einsatzart)</label>
+                    <textarea id="bulkInput" rows="5" placeholder="Frau, 28J | Sonstiges | Wehen alle 3 Min | all | geburt&#10;M, 45J | C_KREISLAUF | Verlegung Herzchirurgie | all | heli"></textarea>
+                </div>
+                <button class="btn-purple" onclick="addBulkEinsatze()">⚡ Alle gleichzeitig hochladen</button>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="card" style="height: calc(100% - 48px);">
+                <h2>🗂️ Live-Datenbank (Gemeinsam genutzt)</h2>
+                
+                <button class="btn-danger-all" onclick="deleteAllEinsatze()">🗑️ Datenbank leeren</button>
+
+                <div class="filter-layout">
+                    <div class="search-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInp" class="search-bar" placeholder="Suchen..." oninput="renderTable()">
+                    </div>
+                    <div>
+                        <select id="tableFilter" onchange="renderTable()">
+                            <option value="any">Alle Saisons</option>
+                            <option value="all">🌐 Ganzjährig</option>
+                            <option value="fruehling">🌱 Frühling</option>
+                            <option value="sommer">☀️ Sommer</option>
+                            <option value="herbst">🍂 Herbst</option>
+                            <option value="winter">❄️ Winter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="tableFilterArt" onchange="renderTable()">
+                            <option value="any">Alle Einsatzarten</option>
+                            <option value="allgemein">📋 Allgemein</option>
+                            <option value="geburt">👶 Geburt</option>
+                            <option value="rea">🫀 Reanimation</option>
+                            <option value="trauma">🩹 Trauma</option>
+                            <option value="vu">🚗 VU</option>
+                            <option value="heli">🚁 Sek. Heli</option>
+                            <option value="neuro">🧠 Neurologie</option>
+                            <option value="kardio">❤️ Kardiologie</option>
+                            <option value="psyche">👥 Psyche</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Patient</th>
+                                <th style="width: 30%;">Kategorie & Problem</th>
+                                <th style="width: 43%;">Symptome / Details</th>
+                                <th style="width: 12%;">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="einsatzTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LIVE-UHRZEITEN LOGIK ---
+    function updateClock() {
+        const now = new Date();
+        
+        // Lokale Zeit
+        const localStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('localTime').innerText = localStr;
+        
+        // UTC Zeit
+        const utcStr = now.toISOString().substr(11, 8);
+        document.getElementById('utcTime').innerText = utcStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // --- DESIGN LOGIK ---
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const checkbox = document.getElementById('themeToggleCheckbox');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark-mode');
+            checkbox.checked = true;
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+            checkbox.checked = false;
+        }
+    }
+
+    function toggleTheme() {
+        const checkbox = document.getElementById('themeToggleCheckbox');
+        if (checkbox.checked) {
+            document.documentElement.classList.add('dark-mode');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+            localStorage.setItem('theme', 'light');
+        }
+    }
+    initTheme();
+
+    // === DEINE SUPABASE-DATEN ===
+    const SUPABASE_URL = "https://ulbuxpordkbpfbafkrtd.supabase.co"; 
+    const SUPABASE_KEY = "sb_publishable_p-Aks2pSG-TzodncB9hfjw_68FNeqYv";
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let einsatzDatenbank = [];
+
+    const saisonConfig = {
+        all: { label: "🌐 Allgemein", class: "badge-all" },
+        fruehling: { label: "🌱 Frühling", class: "badge-fruehling" },
+        sommer: { label: "☀️ Sommer", class: "badge-sommer" },
+        herbst: { label: "🍂 Herbst", class: "badge-herbst" },
+        winter: { label: "❄️ Winter", class: "badge-winter" }
+    };
+
+    const artConfig = {
+        allgemein: "📋 Allgemein",
+        geburt: "👶 Geburt",
+        rea: "🫀 Reanimation",
+        trauma: "🩹 Trauma",
+        vu: "🚗 VU",
+        heli: "🚁 Sek. Heli",
+        neuro: "🧠 Neuro",
+        kardio: "❤️ Kardio",
+        psyche: "👥 Psyche"
+    };
+
+    async function loadData() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('einsatze')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            einsatzDatenbank = data;
+            
+            document.getElementById('einsatzCounter').innerText = `📊 Einsätze gesamt: ${einsatzDatenbank.length}`;
+            renderTable();
+            
+            const statusBadge = document.getElementById('syncStatus');
+            statusBadge.innerText = "☁️ Verbunden";
+            statusBadge.style.background = "#e8f5e9"; statusBadge.style.color = "#2e7d32";
+        } catch (error) {
+            console.error(error);
+            const statusBadge = document.getElementById('syncStatus');
+            statusBadge.innerText = "❌ Verbindungsfehler";
+            statusBadge.style.background = "#ffcdd2"; statusBadge.style.color = "#b71c1c";
+        }
+    }
+
+    function generateEinsatz() {
+        if (einsatzDatenbank.length === 0) {
+            document.getElementById('einsatzOutput').innerText = "Die Online-Datenbank ist leer!";
+            return;
+        }
+
+        const erlaubtSaison = {
+            all: document.getElementById('genAll').checked,
+            fruehling: document.getElementById('genFruehling').checked,
+            sommer: document.getElementById('genSommer').checked,
+            herbst: document.getElementById('genHerbst').checked,
+            winter: document.getElementById('genWinter').checked
+        };
+
+        const erlaubtArt = {
+            allgemein: document.getElementById('artGenAllgemein').checked,
+            geburt: document.getElementById('artGenGeburt').checked,
+            rea: document.getElementById('artGenRea').checked,
+            trauma: document.getElementById('artGenTrauma').checked,
+            vu: document.getElementById('artGenVu').checked,
+            heli: document.getElementById('artGenHeli').checked,
+            neuro: document.getElementById('artGenNeuro').checked,
+            kardio: document.getElementById('artGenKardio').checked,
+            psyche: document.getElementById('artGenPsyche').checked
+        };
+
+        const gefilterteListe = einsatzDatenbank.filter(e => {
+            const saisOk = erlaubtSaison[e.saison || 'all'] === true;
+            const artOk = erlaubtArt[e.art || 'allgemein'] === true;
+            return saisOk && artOk;
+        });
+
+        if (gefilterteListe.length === 0) {
+            document.getElementById('einsatzOutput').innerText = "Keine passenden Einsätze mit diesen Filtern gefunden!";
+            return;
+        }
+
+        const randomIndex = Math.floor(Math.random() * gefilterteListe.length);
+        const e = gefilterteListe[randomIndex];
+        const aktuelleSaison = saisonConfig[e.saison || 'all'] || saisonConfig.all;
+        const aktuelleArt = artConfig[e.art || 'allgemein'] || "📋 Allgemein";
+        
+        document.getElementById('einsatzOutput').innerText = `🚨 [${aktuelleSaison.label.toUpperCase()} - ${aktuelleArt.toUpperCase()}]\nPATIENT: ${e.patient}\n⚠️ PROBLEM: ${e.abcde}\n\n📋 SYMPTOME:\n${e.symptome}`;
+    }
+
+    async function addEinsatz() {
+        const patient = document.getElementById('inpPatient').value.trim();
+        const abcde = document.getElementById('inpAbcde').value.trim();
+        const symptome = document.getElementById('inpSymptome').value.trim();
+        const saison = document.getElementById('inpSaison').value;
+        const art = document.getElementById('inpArt').value;
+
+        if (!patient || !abcde || !symptome) {
+            alert("Bitte alle Felder ausfüllen!"); return;
+        }
+
+        try {
+            const { error } = await supabaseClient.from('einsatze').insert([{ patient, abcde, symptome, saison, art }]);
+            if (error) throw error;
+
+            document.getElementById('inpPatient').value = '';
+            document.getElementById('inpAbcde').value = '';
+            document.getElementById('inpSymptome').value = '';
+            document.getElementById('inpSaison').value = 'all';
+            document.getElementById('inpArt').value = 'allgemein';
+            await loadData(); 
+        } catch (error) {
+            alert("Fehler beim Speichern:\n" + error.message);
+        }
+    }
+
+    async function addBulkEinsatze() {
+        const rawText = document.getElementById('bulkInput').value.trim();
+        if (!rawText) { alert("Das Textfeld ist leer!"); return; }
+
+        const zeilen = rawText.split('\n');
+        const einsatzObjekte = [];
+        const gueltigeSaisons = ['all', 'fruehling', 'sommer', 'herbst', 'winter'];
+        const gueltigeArten = ['allgemein', 'geburt', 'rea', 'trauma', 'vu', 'heli', 'neuro', 'kardio', 'psyche'];
+
+        zeilen.forEach(zeile => {
+            if (!zeile.trim()) return;
+            const teile = zeile.split('|').map(t => t.trim());
+            
+            if (teile.length >= 3) {
+                const patient = teile[0];
+                const abcde = teile[1];
+                const symptome = teile[2];
+                
+                let saison = 'all';
+                if (teile[3] && gueltigeSaisons.includes(teile[3].toLowerCase())) {
+                    saison = teile[3].toLowerCase();
+                }
+
+                let art = 'allgemein';
+                if (teile[4] && gueltigeArten.includes(teile[4].toLowerCase())) {
+                    art = teile[4].toLowerCase();
+                }
+
+                if (patient && abcde && symptome) {
+                    einsatzObjekte.push({ patient, abcde, symptome, saison, art });
+                }
+            }
+        });
+
+        if (einsatzObjekte.length === 0) {
+            alert("Keine gültigen Einsätze erkannt! Prüfe das Format (Trennzeichen: |)"); return;
+        }
+
+        if (confirm(`${einsatzObjekte.length} Einsätze hochladen?`)) {
+            try {
+                const { error } = await supabaseClient.from('einsatze').insert(einsatzObjekte);
+                if (error) throw error;
+                document.getElementById('bulkInput').value = '';
+                alert("Import erfolgreich!");
+                await loadData();
+            } catch (error) {
+                alert("Fehler beim Massen-Upload:\n" + error.message);
+            }
+        }
+    }
+
+    async function deleteEinsatz(id) {
+        if (confirm("Einsatz aus der Cloud löschen?")) {
+            try {
+                const { error } = await supabaseClient.from('einsatze').delete().eq('id', id);
+                if (error) throw error;
+                await loadData(); 
+            } catch (error) { alert(error.message); }
+        }
+    }
+
+    // --- FUNKTION: ALLE EINSÄTZE LÖSCHEN ---
+    async function deleteAllEinsatze() {
+        if (einsatzDatenbank.length === 0) {
+            alert("Die Datenbank ist bereits leer."); return;
+        }
+
+        const ersteAbfrage = confirm(`⚠️ WARNUNG!\nBist du dir absolut sicher, dass du ALLE ${einsatzDatenbank.length} Einsätze unwiderruflich aus der Online-Datenbank löschen möchtest?`);
+        
+        if (ersteAbfrage) {
+            const zweiteAbfrage = confirm("🚨 LETZTE CHANCE!\nDies löscht die gesamte Live-Datenbank für ALLE Nutzer. Wirklich fortfahren?");
+            
+            if (zweiteAbfrage) {
+                try {
+                    // Löscht alle Einträge durch Filterung auf "größer als 0" bei der ID
+                    const { error } = await supabaseClient.from('einsatze').delete().gt('id', 0);
+                    if (error) throw error;
+                    alert("Die Cloud-Datenbank wurde komplett geleert!");
+                    await loadData();
+                } catch (error) {
+                    alert("Fehler beim Löschen der Datenbank:\n" + error.message);
+                }
+            }
+        }
+    }
+
+    function renderTable() {
+        const searchWord = document.getElementById('searchInp').value.toLowerCase();
+        const tableFilter = document.getElementById('tableFilter').value;
+        const tableFilterArt = document.getElementById('tableFilterArt').value;
+        const tbody = document.getElementById('einsatzTableBody');
+        tbody.innerHTML = '';
+
+        einsatzDatenbank.forEach((e) => {
+            const eSaison = e.saison || 'all';
+            const eArt = e.art || 'allgemein';
+
+            const textMatch = e.patient.toLowerCase().includes(searchWord) || 
+                              e.abcde.toLowerCase().includes(searchWord) || 
+                              e.symptome.toLowerCase().includes(searchWord);
+            
+            const saisonMatch = (tableFilter === 'any' || eSaison === tableFilter);
+            const artMatch = (tableFilterArt === 'any' || eArt === tableFilterArt);
+
+            if (textMatch && saisonMatch && artMatch) {
+                const tr = document.createElement('tr');
+                const confSaison = saisonConfig[eSaison] || saisonConfig.all;
+                const textArt = artConfig[eArt] || "📋 Allgemein";
+
+                tr.innerHTML = `
+                    <td><strong>${e.patient}</strong></td>
+                    <td>
+                        <span class="badge ${confSaison.class}">${confSaison.label.split(' ')[0]}</span>
+                        <span class="badge badge-art">${textArt}</span>
+                        <br><small style="display:inline-block; margin-top:4px; font-weight:600;">${e.abcde}</small>
+                    </td>
+                    <td>${e.symptome}</td>
+                    <td><button class="btn-danger" onclick="deleteEinsatz(${e.id})">Löschen</button></td>
+                `;
+                tbody.appendChild(tr);
+            }
+        });
+    }
+
+    async function init() {
+        await loadData();
+        try {
+            supabaseClient
+                .channel('schema-db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'einsatze' }, () => {
+                    loadData();
+                })
+                .subscribe();
+        } catch(e) { console.log("Realtime Fehler"); }
+    }
+    init();
+</script>
+
+</body>
+</html>
