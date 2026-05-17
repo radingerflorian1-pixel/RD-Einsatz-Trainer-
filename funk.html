@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Einsatz Data - BOS Funkstatus</title>
+    <style>
+        /* DESIGN-SYSTEM (Exakt synchron mit den anderen Seiten) */
+        :root {
+            --primary: #2c3e50;
+            --accent-blue: #0078d4;
+            --accent-green: #107c41;
+            --accent-red: #a80000;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --text-main: #201f1e;
+            --text-muted: #605e5c;
+            --border: #edebe9;
+            --input-bg: #faf9f8;
+            --table-hover: #f8fafc;
+            --table-th: #f8f9fa;
+            
+            /* Status spezifische Kennzeichnungen */
+            --bg-status-num: #e0f2fe;     --text-status-num: #0369a1;    --border-status-num: #bae6fd;
+            --bg-status-anw: #fef3c7;     --text-status-anw: #b45309;    --border-status-anw: #fde68a;
+        }
+
+        html.dark-mode {
+            --primary: #f3f4f6;
+            --accent-blue: #2ea0ff;
+            --accent-green: #199e55;
+            --accent-red: #f14c4c;
+            --bg-body: #111214;
+            --bg-card: #1c1d21;
+            --text-main: #f5f5f7;
+            --text-muted: #a1a1aa;
+            --border: #2d3139;
+            --input-bg: #25282f;
+            --table-hover: #24272e;
+            --table-th: #25282f;
+
+            --bg-status-num: #0c4a6e;     --text-status-num: #7dd3fc;    --border-status-num: #0284c7;
+            --bg-status-anw: #78350f;     --text-status-anw: #fde68a;    --border-status-anw: #b45309;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body); color: var(--text-main);
+            margin: 0; padding: 24px; line-height: 1.5;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        header {
+            display: flex; align-items: center; gap: 15px; flex-wrap: wrap;
+            margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid var(--accent-blue);
+        }
+
+        .header-logo { height: 45px; width: auto; object-fit: contain; }
+        header h1 { font-size: 28px; margin: 0; color: var(--primary); font-weight: 700; }
+
+        /* Zurück-Button */
+        .btn-menu-back {
+            background-color: var(--input-bg);
+            color: var(--primary);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.1s ease;
+        }
+        .btn-menu-back:hover {
+            background-color: var(--border);
+            border-color: var(--text-muted);
+        }
+
+        .theme-switch-container {
+            display: flex; align-items: center; gap: 8px; margin-left: auto;
+            font-size: 13px; font-weight: 600; color: var(--text-muted);
+        }
+
+        .theme-switch { position: relative; display: inline-block; width: 48px; height: 24px; }
+        .theme-switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1; transition: .3s; border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute; content: "☀️"; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(24px); content: "🌙"; }
+
+        /* Uhrzeit Anzeige */
+        .time-display {
+            display: flex; gap: 12px; font-size: 13px; font-weight: 600;
+            background: var(--input-bg); padding: 6px 12px; border-radius: 8px;
+            border: 1px solid var(--border); color: var(--text-main);
+        }
+        .time-box { display: flex; align-items: center; gap: 4px; }
+
+        .card {
+            background: var(--bg-card); padding: 24px; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            font-size: 20px; color: var(--primary); margin-top: 0; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        /* Filter und Suche */
+        .filter-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 20px; }
+        @media (max-width: 600px) { .filter-layout { grid-template-columns: 1fr; } }
+        .search-container { position: relative; }
+        .search-bar { width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background-color: var(--input-bg); color: var(--text-main); box-sizing: border-box; }
+        .search-bar:focus, select:focus { outline: none; border-color: var(--accent-blue); }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        
+        select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background-color: var(--input-bg); color: var(--text-main); }
+
+        /* Tabellen Layout */
+        .table-responsive { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--bg-card); color: var(--text-main); }
+        th { background-color: var(--table-th); color: var(--primary); font-weight: 600; padding: 12px 16px; border-bottom: 2px solid var(--border); text-align: left; }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        tr:hover td { background-color: var(--table-hover); }
+
+        /* Badges */
+        .badge-status {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 28px; height: 28px; padding: 0 8px; border-radius: 6px;
+            font-size: 15px; font-weight: 700; text-align: center;
+        }
+        .type-num { background: var(--bg-status-num); color: var(--text-status-num); border: 1px solid var(--border-status-num); }
+        .type-anw { background: var(--bg-status-anw); color: var(--text-status-anw); border: 1px solid var(--border-status-anw); }
+
+        .status-name { font-weight: 700; color: var(--primary); font-size: 16px; }
+        .status-details { color: var(--text-main); font-size: 14px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <img id="headerLogo" src="logo.png" alt="Logo" class="header-logo">
+        <h1>BOS-Funk Statusübersicht</h1>
+        
+        <a href="index.html" class="btn-menu-back">🏠 Hauptmenü</a>
+        
+        <div class="theme-switch-container">
+            <span>Dunkelmodus</span>
+            <label class="theme-switch">
+                <input type="checkbox" id="themeToggleCheckbox" onchange="toggleTheme()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="time-display">
+            <div class="time-box">🕒 LOKAL: <span id="localTime">00:00:00</span></div>
+            <div class="time-box">🌍 UTC: <span id="utcTime">00:00:00</span></div>
+        </div>
+    </header>
+
+    <div class="card">
+        <div class="filter-layout">
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInp" class="search-bar" placeholder="Nach Status, Bedeutung oder Details suchen..." oninput="filterStatusTable()">
+            </div>
+            <div>
+                <select id="typeFilter" onchange="filterStatusTable()">
+                    <option value="all">Alle Statustypen</option>
+                    <option value="num">Fahrzeugstatus (0-9)</option>
+                    <option value="anw">Leitstellen-Anweisungen (A-Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 12%;">Status</th>
+                        <th style="width: 33%;">Bedeutung</th>
+                        <th style="width: 55%;">Details / Anwendung in VAR</th>
+                    </tr>
+                </thead>
+                <tbody id="statusTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATENSATZ FUNKSTATUS ---
+    const funkDaten = [
+        // Fahrzeugstatus (Numerisch)
+        { status: "0", bedeutung: "Priorisierter Sprechwunsch", details: "Das Einsatzmittel möchte vor allen anderen Kontakt mit der Leitstelle aufnehmen.", typ: "num" },
+        { status: "1", bedeutung: "Einsatzbereit über Funk", details: "Das Einsatzmittel kann nach Rücksprache und abhängig vom Standort alarmiert werden.", typ: "num" },
+        { status: "2", bedeutung: "Einsatzbereit auf Wache", details: "Das Einsatzmittel kann am Heimatstandort alarmiert werden.", typ: "num" },
+        { status: "3", bedeutung: "Einsatz übernommen", details: "Das Einsatzmittel hat den Auftrag angenommen und befindet sich auf Anfahrt.", typ: "num" },
+        { status: "4", bedeutung: "Einsatzort an", details: "Das Einsatzmittel ist mit der Abarbeitung vor Ort beschäftigt und nur bedingt erreichbar.", typ: "num" },
+        { status: "5", bedeutung: "Sprechwunsch", details: "Das Einsatzmittel möchte Kontakt mit der Leitstelle aufnehmen.", typ: "num" },
+        { status: "6", bedeutung: "Nicht einsatzbereit", details: "Das Einsatzmittel kann nicht alarmiert werden.", typ: "num" },
+        { status: "7", bedeutung: "Einsatzgebunden", details: "Das Einsatzmittel hat einen Patienten aufgenommen und kann nicht alarmiert werden.", typ: "num" },
+        { status: "8", bedeutung: "Bedingt verfügbar", details: "Das Einsatzmittel kann mit einer längeren Reaktionszeit nach Rücksprache alarmiert werden.", typ: "num" },
+        { status: "9", bedeutung: "Fahrzeuganmeldung", details: "Das Einsatzmittel meldet sich im Funkverkehrsbereich an. Bei der VAR: Meldung nach dem Einloggen.", typ: "num" },
+        
+        // Statusanweisungen (Alphabetisch)
+        { status: "E", bedeutung: "Einsatzabbruch", details: "Das Einsatzmittel wird vom Einsatz abgezogen und quittiert mit 2 oder 1.", typ: "anw" },
+        { status: "C", bedeutung: "Einsatzübernahme melden", details: "Dem Disponenten muss mit Status 3 die Übernahme des Einsatzes quittiert werden.", typ: "anw" },
+        { status: "F", bedeutung: "Kommen Sie über Draht", details: "Das Einsatzmittel muss sich telefonisch (per Discord) beim Disponenten melden.", typ: "anw" },
+        { status: "H", bedeutung: "Fahren Sie Wache an", details: "Keine Nutzung in der VAR.", typ: "anw" },
+        { status: "J", bedeutung: "Sprechaufforderung", details: "(nach Status 5/0) Nicht-mündliche Aufforderung, mit dem Sprechen zu beginnen.", typ: "anw" },
+        { status: "L", bedeutung: "Geben Sie Lagemeldung", details: "Die Leitstelle fordert eine Lagemeldung vom Rettungsmittel an.", typ: "anw" },
+        { status: "P", bedeutung: "Einsatz mit Polizei/Pause nehmen", details: "Keine Nutzung in der VAR.", typ: "anw" },
+        { status: "U", bedeutung: "Unerlaubte Statusfolge", details: "Keine Nutzung in der VAR.", typ: "anw" },
+        { status: "c", bedeutung: "Status korrigieren", details: "Das Einsatzmittel hat einen offensichtlich falschen Status gesetzt und muss diesen korrigieren.", typ: "anw" },
+        { status: "d", bedeutung: "Transportziel durchgeben", details: "Die Leitstelle erfragt das Transportziel des Rettungsmittels.", typ: "anw" },
+        { status: "h", bedeutung: "Zielklinik verständigt", details: "Die Leitstelle hat die Zielklinik verständigt und positive Rückmeldung erhalten.", typ: "anw" },
+        { status: "o", bedeutung: "Warten, alle Abfrageplätze belegt", details: "Das Rettungsmittel muss auf die Sprechaufforderung warten.", typ: "anw" },
+        { status: "u", bedeutung: "Verstanden", details: "Die Leitstelle hat die Informationen aufgenommen und verstanden.", typ: "anw" }
+    ];
+
+    // --- RENDER & FILTER TABELLE ---
+    function filterStatusTable() {
+        const searchWord = document.getElementById('searchInp').value.toLowerCase();
+        const typeFilter = document.getElementById('typeFilter').value;
+        const tbody = document.getElementById('statusTableBody');
+        tbody.innerHTML = '';
+
+        funkDaten.forEach(item => {
+            const matchesSearch = item.status.toLowerCase().includes(searchWord) || 
+                                  item.bedeutung.toLowerCase().includes(searchWord) || 
+                                  item.details.toLowerCase().includes(searchWord);
+            
+            const matchesType = (typeFilter === 'all' || item.typ === typeFilter);
+
+            if (matchesSearch && matchesType) {
+                const tr = document.createElement('tr');
+                const badgeClass = item.typ === 'num' ? 'type-num' : 'type-anw';
+                
+                tr.innerHTML = `
+                    <td><span class="badge-status ${badgeClass}">${item.status}</span></td>
+                    <td><span class="status-name">${item.bedeutung}</span></td>
+                    <td><div class="status-details">${item.details}</div></td>
+                `;
+                tbody.appendChild(tr);
+            }
+        });
+    }
+
+    // --- DESIGN & THEME LOGIK ---
+    const LOGO_LIGHT = "logo.png";
+    const LOGO_DARK = "logo2.png"; 
+
+    function updateLogos(isDark) {
+        const headerLogo = document.getElementById('headerLogo');
+        if (headerLogo) headerLogo.src = isDark ? LOGO_DARK : LOGO_LIGHT;
+    }
+
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const checkbox = document.getElementById('themeToggleCheckbox');
+        const wantsDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        
+        if (wantsDark) {
+            document.documentElement.classList.add('dark-mode');
+            if(checkbox) checkbox.checked = true;
+            updateLogos(true);
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+            if(checkbox) checkbox.checked = false;
+            updateLogos(false);
+        }
+        filterStatusTable(); // Initiale Tabelle laden
+    }
+
+    function toggleTheme() {
+        const checkbox = document.getElementById('themeToggleCheckbox');
+        if (checkbox.checked) {
+            document.documentElement.classList.add('dark-mode');
+            localStorage.setItem('theme', 'dark');
+            updateLogos(true);
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+            localStorage.setItem('theme', 'light');
+            updateLogos(false);
+        }
+    }
+
+    // --- LIVE-UHRZEITEN LOGIK ---
+    function updateClock() {
+        const now = new Date();
+        const localStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('localTime').innerText = localStr;
+        const utcStr = now.toISOString().substr(11, 8);
+        document.getElementById('utcTime').innerText = utcStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    window.addEventListener('DOMContentLoaded', initTheme);
+</script>
+
+</body>
+</html>
